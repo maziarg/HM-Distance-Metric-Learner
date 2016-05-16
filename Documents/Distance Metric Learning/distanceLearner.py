@@ -7,7 +7,7 @@ import operator
 import scipy
 import KNNs
 import numpy
-from dataParser import Paeser
+from Modified_Parser import Paeser
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as pyplot
@@ -44,6 +44,7 @@ class Learner(object):
     def compute_A(self):
         A=[]
         for i in range(len(self.S)):
+            temp=self.compute_A_i(self.S[i])
             A.append(self.compute_A_i(self.S[i]))
         return A
     
@@ -59,11 +60,10 @@ class Learner(object):
     def compute_A_star(self):
         A_star=[]
         for i in range(len(self.D)):
-            
             temp=[]
             for j in range(len(self.D)):
                 temp.append(np.mat(self.D[i])*np.mat(self.B[j])*np.mat(self.D[i]).T)
-            A_star.append(np.ravel(temp))
+            A_star.append(temp)
         return A_star
     
     def compute_B_star(self):
@@ -132,12 +132,18 @@ class Learner(object):
 
 
     def getAccuracy(self, testSet, predictions):
-        correct = 0
-        testSet=np.ravel(testSet)
-        for x in range(len(testSet)):
-            if testSet[x] == predictions[x]:
-                correct += 1
-        return (correct/float(len(testSet))) * 100.0
+        correct=0
+        for i in range(len(testSet)):
+            for j in range(len(testSet)):
+
+                if (testSet[i] == testSet[j]):
+                    if predictions[i]==predictions[j]:
+                        correct += 1
+                else:
+                    if predictions[i] != predictions[j]:
+                        correct += 1
+        Z= (len(testSet))**2
+        return (correct/float(Z)) * 100.0
     def mydist(self,x,y):
         return np.math.sqrt(np.mat(x - y).T*self.Metric*np.mat(x - y))
 
@@ -173,24 +179,24 @@ def run_experiment(k):
         # reigCoef=[100,0.05,0.1,1,10,100,1000,10000]
         featureDim=7
     
-        path="/Users/mgomrokchi/Documents/workspace/Distance Metric Learning/seeds_dataset.txt"
-        myParser= Paeser(path,splitList[i])
-        Data=myParser.DataGen()
-        mLearner=Learner(1000,Data[0][0],Data[0][3],featureDim)
-        lambdaVec=mLearner.computeLambda(len(Data[0][3]))
+        pathh="/Users/Hossein/Desktop/Python projects/seeds_dataset.txt"
+        myParser= Paeser(similarDataFilePath=pathh,splitSize=splitList[i],Flag=1,Dimension=8,Labels=[1,2,3])
+        Data=myParser.DataGen(Density=200)
+        mLearner=Learner(0.001,Data[0][0],Data[0][1],featureDim)
+        lambdaVec=mLearner.computeLambda(len(Data[0][1]))
         M=mLearner.compute_M(np.ravel(lambdaVec))
         mLearner.Metric=M
     # mLearner.knnDemo(origData[1], origData[2])
         if not mLearner.is_pos_def(M):
             M=KNNs._getAplus(M)
         #print(M)
-        X_train=Data[1][0]+Data[1][3]
+        X_train=Data[1][0]
         X_train=np.reshape(X_train, (len(X_train),8))
         y_train=X_train[:,7]
         X_train=scipy.delete(X_train, 7, 1)
-        X_test=Data[1][9]
-        X_test=np.reshape(X_test,(len(X_test),8)) 
-        y_test=X_test[:,7] 
+        X_test=Data[1][1]
+        X_test=np.reshape(X_test,(len(X_test),8))
+        y_test=X_test[:,7]
         X_test=scipy.delete(X_test, 7, 1)
         #mLearner.Metric=M
         # modelL2=neighbors.KNeighborsClassifier(n_neighbors=5, weights='uniform', algorithm='auto', leaf_size=30, p=2, metric='euclidean', metric_params=None)
@@ -199,27 +205,25 @@ def run_experiment(k):
         WTrain = KNNs.fit(X_train,y_train)
         for metricType in ['myMetric','l2','LMNN']:
             predictions=[]
-            if metricType=='LMNN':
-                z=python_LMNN(k=k)
-                z.fit(X_train, y_train, False)
-                L_Lmnn=z.metric()
-                predictions=KNNs.prediction(WTrain,X_test,k,L_Lmnn
-                                            )
-                LMNNAccuracy.append(mLearner.getAccuracy(y_test, predictions))
+            # if metricType=='LMNN':
+            #     z=python_LMNN(k=k)
+            #     z.fit(X_train, y_train, False)
+            #     L_Lmnn=z.metric()
+            #     predictions=KNNs.prediction(WTrain,X_test,k,L_Lmnn)
+            #     LMNNAccuracy.append(mLearner.getAccuracy(y_test, predictions))
             if metricType=='l2':
 
                 predictions=KNNs.prediction(WTrain,X_test,k,numpy.identity(featureDim))
                 l2Accuray.append(mLearner.getAccuracy(y_test, predictions))
             if metricType=='myMetric':
-
-                predictions=predictions=KNNs.prediction(WTrain,X_test,k,M)
+                predictions=KNNs.prediction(WTrain,X_test,k,M)
                 myMetricAccuracy.append(mLearner.getAccuracy(y_test, predictions))
         i+=1
     return [l2Accuray,myMetricAccuracy,LMNNAccuracy,mLearner.beta]
 def main():
     splitList=[0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9]
-    numRounds=20
-    k=15
+    numRounds=5
+    k=5
     l2Accuray=[]
     l2Accuraylb=[]
     l2Accurayub=[]
@@ -239,37 +243,34 @@ def main():
         for j in range(len(splitList)):
             expResultsL2[i][j]=temp[0][j]
             expResultsHM[i][j]=temp[1][j]
-            expResultsLmnnn[i][j]=temp[2][j]
+            # expResultsLmnnn[i][j]=temp[2][j]
 
-    
     for i in range(len(splitList)):
-        templ2=[]
-        tempHM=[]
-        tempLmnn=[]
+        templ2 = []
+        tempHM = []
+        # tempLmnn = []
         for j in range(numRounds):
-            tempHM.append(expResultsHM[j,i])
-            templ2.append(expResultsL2[j,i])
-            tempLmnn.append(expResultsLmnnn[j,i])
+            tempHM.append(expResultsHM[j, i])
+            templ2.append(expResultsL2[j, i])
+            # tempLmnn.append(expResultsLmnnn[j, i])
         l2Accuray.append((np.mean(templ2)))
-        l2Accuraylb.append(np.math.log(((np.mean(templ2))-(np.std(templ2)))))
-        l2Accurayub.append(np.math.log(((np.mean(templ2)+np.std(templ2)))))        
-        
-        
-        myMetricAccuracy.append(np.mean(tempHM))
-        myMetricAccuracylb.append(np.math.log((np.mean(tempHM)-np.std(tempHM))))
-        myMetricAccuracyub.append(np.math.log(np.mean(tempHM)+np.std(tempHM)))
+        l2Accuraylb.append(np.math.log(((np.mean(templ2)) - (np.std(templ2)))))
+        l2Accurayub.append(np.math.log(((np.mean(templ2) + np.std(templ2)))))
 
-        lmnnAccuray.append(np.mean(tempLmnn))
-        lmnnAccuraylb.append(np.math.log((np.mean(tempLmnn)-np.std(tempLmnn))))
-        lmnnAccurayub.append(np.math.log(np.mean(tempLmnn)+np.std(tempLmnn)))
-        
+        myMetricAccuracy.append(np.mean(tempHM))
+        myMetricAccuracylb.append(np.math.log((np.mean(tempHM) - np.std(tempHM))))
+        myMetricAccuracyub.append(np.math.log(np.mean(tempHM) + np.std(tempHM)))
+
+        # lmnnAccuray.append(np.mean(tempLmnn))
+        # lmnnAccuraylb.append(np.math.log((np.mean(tempLmnn) - np.std(tempLmnn))))
+        # lmnnAccurayub.append(np.math.log(np.mean(tempLmnn) + np.std(tempLmnn)))
+        #
     ax = plt.gca()
     ax.set_color_cycle(['b', 'r', 'g', 'c', 'k', 'y', 'm'])
     ax.errorbar(splitList,l2Accuray,yerr=[l2Accurayub,l2Accuraylb])
     ax.errorbar(splitList,myMetricAccuracy,yerr=[myMetricAccuracyub,myMetricAccuracylb])
-    ax.errorbar(splitList,lmnnAccuray,yerr=[lmnnAccurayub,lmnnAccuraylb])
-    #ax.plot(splitList,l2Accuray)
-    #ax.plot(splitList,myMetricAccuracy)
+    # ax.errorbar(splitList,lmnnAccuray,yerr=[lmnnAccurayub,lmnnAccuraylb])
+
     ax.set_yscale('log')
     plt.ylabel('(log)Accuracy')
     plt.xlabel('percentage of the training data size')
