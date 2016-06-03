@@ -1,187 +1,107 @@
 '''
 Created on Apr 15, 2016
 
+@author: Hossein and Maziar
 
-
-@author: mgomrokchi
 '''
 
 import numpy as np
-from random import shuffle
+import random 
 import scipy
-
 from sklearn.cross_validation import train_test_split
-
-from _random import Random
-
-
 
 class Paeser():
 
-    '''
 
-    classdocs
-
-    '''
-
-    def __init__(self,Labels,Dimension,similarDataFilePath,splitSize,Flag):
-
-        self.sFilePath=similarDataFilePath
-
-        self.classIndex = Dimension - 1
+    def __init__(self,Lables,Dimension,similarDataFilePath,splitSize,startIndex=0):
+        '''Dimension = index of the class label'''
+        self.filePath=similarDataFilePath
+        self.classIndex = Dimension-1
         self.splitSize = splitSize
-        self.originalData=self.parseData()[0]
-        A=[]
-        Classes=[]
-
-        for i in range(Flag, len(Labels)+Flag):
-            Classes.append([i,[]])
-        if(Flag==0):
-            Classes.append(0)
-
-        else:
-            Classes.append(1)
-
-        self.Classes__ = Classes
-
-
-
+        
+        self.Classes=self.classConstructor(Lables)
+        self.statrtIndex=startIndex
+        self.originalData=self.parseData()
+        
+    def classConstructor(self,Lables): 
+        temp=[]
+        for i in Lables:
+            temp.append([i,[]])
+        return temp 
+    
     def parseData(self):
-        Class__index=self.classIndex-1
-        X =np.genfromtxt(self.sFilePath)
+        X=np.loadtxt(self.filePath, delimiter=',', usecols=range(self.statrtIndex,self.classIndex+self.statrtIndex))
+        self.classIndex-=self.statrtIndex
+        #X_unlabled=scipy.delete(X
+        return X
 
-        X_unlabled=scipy.delete(X, Class__index, 1)
+    def DataGen(self,Density=0.5):
+        '''
+        This function extracts the relations among data-points and returns training and test data accordingly 
+        Density= The percentqge o, len(X[0])-1, 1)
+        #y=X[:,len(X[0])-1]f the total number of relations extracted from the input dataset
+        
+        '''
+        numberOfClasses= len(self.Classes)-1
+        random_state = np.random.randint(1, len(self.originalData))
 
-        y=X[:,Class__index]
-
-        #y = np.loadtxt(self.sFilePath,usecols=range(1))
-
-        #for i in range(len(x)):
-
-        #    z.append(x[i]-y[i])
-
-        return [X,X_unlabled,y]
-
-
-
-    def DataGen(self,Density):
-
-        #testSet=[]
-        Similars=[]
-        Disimilars=[]
-
-
-
+        
+        '''similar and disimilar difference of records'''
         SDif1_train=[]
-
-
-
         DDif1_train=[]
-
-        EE= len(self.Classes__)-1
-        random_state = np.random.randint(1, 200)
-        q=self.splitSize/2
-        Train_Data, Test_Data = train_test_split(self.originalData, train_size=q, random_state=random_state)
-        Trian_Data1,Test_Data1= train_test_split(Test_Data, train_size=self.splitSize, random_state=random_state)
+        
+        
+        ''' Random state chosen to have different train and test sets any time calling this piece of code'''  
+        Train_Data, Test_Data = train_test_split(self.originalData, train_size=self.splitSize, random_state=random_state)
+        
+        '''Partition the training data into different classes'''
         for i in range(len(Train_Data)):
-
-            for j in range(EE):
-                if(Train_Data[i][self.classIndex]==self.Classes__[j][0]):
-                    self.Classes__[j][1].append(Train_Data[i])
+            for j in range(numberOfClasses):
+                if(Train_Data[i][self.classIndex]==self.Classes[j][0]):
+                    self.Classes[j][1].append(Train_Data[i])
+                
+        '''Filling up the training data with similar relations'''
+        similarSample=[]
+        disSimilarSample=[]
+        for i in range(numberOfClasses):
+            length = len(self.Classes[i][1]) 
+            for j in range(int(0.5*length*(length-1)*Density)):
+                tempPair=[]
+                if len(self.Classes[i][1])==0:
+                        break
+                a=random.sample(self.Classes[i][1],2)
+                tempPair=[np.array(a[0]).tolist(),np.array(a[1]).tolist()]
+                if  all(tempPair) in disSimilarSample:    
+                    j-=1
                 else:
-                    continue
+                    disSimilarSample.append(tempPair)
+                    
+            
+        for i in range(numberOfClasses):
+            for j in range(i+1,numberOfClasses):
+                for k in range(int(Density*len(self.Classes[i][1])*len(self.Classes[j][1]))):
+                    tempPair=[]
+                    if len(self.Classes[j][1])==0 or len(self.Classes[i][1])==0:
+                        break
+                    a=random.sample(self.Classes[i][1],1)
+                    b=random.sample(self.Classes[j][1],1)
+                    a=(np.array(a).tolist())
+                    b=(np.array(b).tolist())
+                    tempPair=[a[0],b[0]]
+                    if  all(tempPair) in disSimilarSample:    
+                        k-=1
+                    else:
+                        disSimilarSample.append(tempPair)
+                        
+        
+        for i in range(len(similarSample)):
+            SDif1_train.append(np.subtract(similarSample[i][0], similarSample[i][1]))
 
+        for i in range(len(disSimilarSample)):
+            DDif1_train.append(np.subtract(disSimilarSample[i][0],disSimilarSample[i][1]))
 
+        SDif1_train=scipy.delete(SDif1_train, self.classIndex, 1)
+        DDif1_train=scipy.delete(DDif1_train, self.classIndex, 1)
 
-
-
-        ss=len(self.Classes__)-1
-        for i in range(ss):
-            T=CombinSim(self.Classes__[i][1])
-            q=i+1
-            if(q<ss):
-                for k in range(q,ss):
-                    T2=CombinDiff(self.Classes__[i][1],self.Classes__[k][1])
-                    for l in T2:
-                        A = self.Classes__[i][1][l[0]]
-                        B = self.Classes__[k][1][l[1]]
-                        C = []
-                        C.append(A)
-                        C.append(B)
-                        Disimilars.append(C)
-            for j in T:
-                A=self.Classes__[i][1][j[0]]
-                B=self.Classes__[i][1][j[1]]
-                C=[]
-                C.append(A)
-                C.append(B)
-                Similars.append(C)
-
-
-        shuffle(Similars)
-        shuffle(Disimilars)
-        i=0
-        Similars=Similars[0:Density]
-        Disimilars=Disimilars[0:Density]
-
-
-        print(random_state)
-
-
-
-
-
-
-        for i in range(len(Similars)):
-
-            SDif1_train.append(np.subtract(Similars[i][0], Similars[i][1]))
-
-        for i in range(len(Disimilars)):
-
-            DDif1_train.append(np.subtract(Disimilars[i][0],Disimilars[i][1]))
-
-
-
-
-
-
-
-
-
-        SDif1_train=scipy.delete(SDif1_train, 7, 1)
-
-
-
-        DDif1_train=scipy.delete(DDif1_train, 7, 1)
-
-
-
-
-
-        return [[SDif1_train,DDif1_train],[Trian_Data1,Test_Data1]]
-
-
-
-
-def CombinSim(X1):
-        Tupp=[]
-
-        for i in range(0, len(X1)):
-            q=i+1
-            if(q==len(X1)):
-                continue
-            for j in range(q, len(X1)):
-                if (i == j):
-                    continue
-                else:
-                    Tupp.append((i, j))
-        return Tupp
-
-
-def CombinDiff(X1,X2):
-    Tupp = []
-
-    for i in range(0, len(X1)):
-        for j in range(0, len(X2)):
-            Tupp.append((i, j))
-    return Tupp
+        return [[SDif1_train,DDif1_train],[Train_Data,Test_Data]]
+   
